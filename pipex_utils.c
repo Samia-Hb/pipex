@@ -1,51 +1,98 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   pipex_utils.c                                      :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: shebaz <shebaz@student.42.fr>              +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2024/02/24 01:23:19 by shebaz            #+#    #+#             */
+/*   Updated: 2024/07/02 00:11:54 by shebaz           ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "pipex.h"
 
-char	*ft_strdup(const char *s1)
+void	check_inverted_commas(char *cmd)
 {
-	size_t		i;
-	char		*s;
+	char	*trimmed;
+
+	trimmed = ft_strtrim(cmd, "'");
+	ft_printf("zsh: command not found: %s\n", trimmed);
+	free(trimmed);
+}
+
+void	remove_string(char **str)
+{
+	int	i;
 
 	i = 0;
-	s = (char *)malloc(ft_strlen(s1) + 1);
-	if (!s)
-		return (NULL);
-	while (i < ft_strlen(s1))
+	if (!str)
+		return ;
+	while (str[i])
 	{
-		s[i] = s1[i];
+		free(str[i]);
 		i++;
 	}
-	s[i] = '\0';
-	return (s);
+	free(str);
 }
-char *ft_strcpy(char *dest,char *src)
+
+int	check_full_command(char *cmd)
 {
-    int i = 0;
-
-    while (src[i])
-    {
-        dest[i] = src[i];
-        i++;
-    }
-    dest[i] = '\0';
-    return dest;
+	if (cmd[0] == 39 && cmd[strlen(cmd) - 1] == 39)
+		return (-4);
+	return (1);
 }
-char *ft_strcat(char *dest,char *src)
+
+char	**arr(char *cmd)
 {
-    int i;
-    int j;
+	int		arr_count;
+	int		i;
+	char	**arr;
+	char	**new_arr;
 
-    i = 0;
-    j = 0;
-    while(dest[i])
-        i++;
-    while(src[j])
-    {
-        dest[i + j] = src[j];
-        j++;
-    }
-    dest[i + j] = '\0';
-    return dest;
+	arr = ft_split(cmd, ' ');
+	i = 0;
+	arr_count = 0;
+	check_cmds(arr);
+	while (arr[arr_count] != NULL)
+		arr_count++;
+	new_arr = malloc((arr_count + 2) * sizeof(char *));
+	if (!new_arr)
+	{
+		free(arr);
+		exit(1);
+	}
+	while (i < arr_count)
+	{
+		new_arr[i] = arr[i];
+		i++;
+	}
+	free(arr);
+	new_arr[arr_count] = NULL;
+	return (new_arr);
 }
 
+void	execute_commands(char **argv, char **envp)
+{
+	int	pipefd[2];
+	int	pid1;
+	int	pid2;
 
-
+	if (pipe(pipefd) == -1)
+		return (perror("pipe"));
+	pid1 = fork();
+	if (pid1 == -1)
+		return (perror("fork"));
+	else if (pid1 == 0)
+		execute_cmd1(pipefd[0], pipefd[1], argv, envp);
+	else
+	{
+		pid2 = fork();
+		if (pid2 == -1)
+			return (perror("fork"));
+		else if (pid2 == 0)
+			execute_cmd2(pipefd[0], pipefd[1], argv, envp);
+		else
+			norm(pipefd[0], pipefd[1], pid1, pid2);
+	}
+}
